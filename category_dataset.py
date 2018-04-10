@@ -1,7 +1,4 @@
-import os
-import pickle
-import string
-import sys
+import os, pickle, string, sys
 
 from nltk import word_tokenize
 from nltk.corpus import stopwords
@@ -67,7 +64,8 @@ if __name__ == '__main__':
     files_path = getFilesFromPath(path)
     wordnet = WordNetLemmatizer()
 
-    print("Number of files: " + str(len(files_path)))
+    print("Folder name     : " + path)
+    print("Number of files : " + str(len(files_path)))
 
     # Store dataset
     fulldataset = []
@@ -92,4 +90,4 @@ if __name__ == '__main__':
 
     # Store in Pickle
     pickle.dump(fulldataset, open('dataset.p', "wb"))
-    print(len(fulldataset))
+    print("File contains " + str(len(fulldataset)) + " records")
