@@ -4,6 +4,7 @@ from pprint import pprint
 from time import time
 import logging, pickle, string
 import pandas as pd
+import numpy as np
 from nltk import word_tokenize
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
@@ -16,7 +17,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.feature_selection import SelectKBest, chi2, f_classif, f_regression
 from sklearn.metrics import confusion_matrix
 from sklearn import model_selection
 from sklearn.preprocessing import OneHotEncoder
@@ -27,6 +28,7 @@ from sklearn.metrics import classification_report
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.linear_model import RidgeClassifier
+from sklearn.model_selection import RandomizedSearchCV
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -72,81 +74,13 @@ def cleanText(text):
 # Load some categories from the training set
 # #############################################################################
 
-# COMPUTER SCIENCE DATASET ONLY
-
-'''
-data = pickle.load(open('files/processed/category_dataset.p', "rb"))
-data = pd.DataFrame(data)
-
-print(len(data))
-
-df = pd.DataFrame(columns=data.columns)
-for cat in data['cat'].value_counts().index:
-    
-    #print("category : " + cat + ' has: ' + str(data['cat'].value_counts()[cat]))
-    if cat.startswith('cs.') and data['cat'].value_counts()[cat] > 4000:
-        #print(cat)
-        cat1 = data[(data.cat == cat)].sample(n=4000)
-        df = pd.concat([df, cat1], axis=0)
-
-
-print(len(df))
-'''
-
-
-# #############################################################################
-# Define a pipeline combining a text feature extractor with a simple
-# classifier
-pipeline = Pipeline([
-    ('vect', CountVectorizer()),
-    ('tfidf', TfidfTransformer()),
-
-    # Dimention reduction
-    # Find the 2000 most informative columns
-    ('chi2', SelectKBest(chi2, k=4000)),
-
-    #('clf', SGDClassifier()),
-    #('tree', ExtraTreesClassifier())
-
-    #('SVC', SVC(probability=True)))
-    #('clf', DecisionTreeClassifier(max_depth=10),)
-    ("SGD", SGDClassifier(loss='modified_huber')),
-    #("ASGD", SGDClassifier(average=True)),
-    #("Passive-Aggressive I", PassiveAggressiveClassifier(loss='hinge', C=1.0)),
-    #("Passive-Aggressive II", PassiveAggressiveClassifier(loss='squared_hinge', C=1.0)),
-    #('ridge', RidgeClassifier(tol=1e-2, solver="lsqr"))
-    #('nb', MultinomialNB('''fit_prior=False'''))
-])
-
-
-# uncommenting more parameters will give better exploring power but will
-# increase processing time in a combinatorial way
-parameters = {
-    'vect__max_df': (0.7, 0.8, 0.9),
-    #'vect__max_features': (None, 5000, 10000, 50000),
-    'vect__ngram_range': ((1, 1), (1, 2)),  # unigrams or bigrams
-    #'tfidf__use_idf': (True, False),
-    'tfidf__norm': ('l1','l2'),
-
-    #'nb__alpha': (1e-3, 1e-4),
-
-    #'clf__alpha': (0.00001, 0.000001, 0.0000001),
-    #'clf__penalty': ('l2', 'elasticnet'),
-    ##'clf__n_iter': (10, 50, 80),
-
-    #'tree__n_estimators': (500,1000,2000),
-    #'tree__max_features': (32, 64)
-}
-
-
 def encodeData(data):
     le = preprocessing.LabelEncoder()
     le.fit(data[cat_name])
     return list(le.classes_), le.transform(data[cat_name])
 
+def openDataset(filename, cat_name, nb_element_per_cat, sub_cat_filter=None):
 
-def openDataset(filename, cat_name):
-    
     # Open dataset
     data = pickle.load(open(filename, "rb"))
     data = pd.DataFrame(data)
@@ -156,9 +90,16 @@ def openDataset(filename, cat_name):
 
         print("category : " + cat + ' has: ' + str(data[cat_name].value_counts()[cat]))
 
-        if data[cat_name].value_counts()[cat] > 8300:
-            cat1 = data[(data[cat_name] == cat)].sample(n=8300)
-            df = pd.concat([df, cat1], axis=0)
+        # If no filter -> get all categories
+        if(not sub_cat_filter):
+            if data[cat_name].value_counts()[cat] > nb_element_per_cat:
+                cat1 = data[(data[cat_name] == cat)].sample(n=nb_element_per_cat)
+                df = pd.concat([df, cat1], axis=0)
+        else:
+            # Get specific categories with filter
+            if cat.startswith(sub_cat_filter) and data[cat_name].value_counts()[cat] > nb_element_per_cat:
+                cat1 = data[(data.cat == cat)].sample(n=nb_element_per_cat)
+                df = pd.concat([df, cat1], axis=0)
 
     print("Total data: " + str(len(data)))
     return df
@@ -168,19 +109,87 @@ def getClassNameFromProba(probaArray, enc):
     print(enc)
     idx = probaArray.flatten().argmax(axis=0)
     return enc[idx]
+
+
+def performGridSearch(pipeline, data, cat_name):
+    
+    parameters = {
+        'vect__max_df': np.arange(0.5, 1, 0.05),
+        #'vect__max_features': (None, 5000, 10000, 50000),
+        'vect__ngram_range': ((1, 1), (1, 2)),  # unigrams or bigrams
+        'tfidf__use_idf': (True, False),
+        'tfidf__norm': ('l1', 'l2', None),
+
+        'kbest__k': np.arange(500, 15000, 500),
+        'kbest__score_func': (chi2, f_classif, f_regression),
+        #'nb__alpha': (1e-3, 1e-4),
+
+        #'clf__alpha': (0.00001, 0.000001, 0.0000001),
+        #'clf__penalty': ('l2', 'elasticnet'),
+        ##'clf__n_iter': (10, 50, 80),
+
+        #'tree__n_estimators': (500,1000,2000),
+        #'tree__max_features': (32, 64)
+
+        #'SGD__seed': [0],
+        'SGD__loss': ('log', 'hinge'),
+        'SGD__penalty': ['l1', 'l2', 'elasticnet'],
+        'SGD__alpha': [0.001, 0.0001, 0.00001, 0.000001, 0.0000001, 0.00000001]
+    }
+    
+    grid_search = RandomizedSearchCV(pipeline, parameters, n_jobs=-1, verbose=10)
+
+    print("Performing grid search...")
+    print("pipeline:", [name for name, _ in pipeline.steps])
+    print("parameters:")
+    pprint(parameters)
+    t0 = time()
+    print(data[cat_name])
+    grid_search.fit(data.input, data[cat_name])
+    print("done in %0.3fs" % (time() - t0))
+    print()
+    print("Best score: %0.3f" % grid_search.best_score_)
+    print("Best parameters set:")
+    best_parameters = grid_search.best_estimator_.get_params()
+    for param_name in sorted(parameters.keys()):
+        print("\t%s: %r" % (param_name, best_parameters[param_name]))
     
 
 if __name__ == "__main__":
-    # multiprocessing requires the fork to happen in a __main__ protected
-    # block
 
+    # Define
     cat_name = 'cat_main'
-    data = openDataset('files/processed/main2_category_dataset.p', cat_name)
-
+    element_per_cat = 8300
     test_size = 0.33
     seed = 7
 
-    # encode
+    pipeline = Pipeline([
+        ('vect', CountVectorizer()),
+        ('tfidf', TfidfTransformer()),
+
+        # Dimention reduction
+        # Find the 4000 most informative columns
+        ('kbest', SelectKBest()),
+
+        #('clf', SGDClassifier()),
+        #('tree', ExtraTreesClassifier())
+
+        #('SVC', SVC(probability=True)))
+        #('clf', DecisionTreeClassifier(max_depth=10),)
+        ("SGD", SGDClassifier(loss='modified_huber')),
+        #("ASGD", SGDClassifier(average=True)),
+        #("Passive-Aggressive I", PassiveAggressiveClassifier(loss='hinge', C=1.0)),
+        #("Passive-Aggressive II", PassiveAggressiveClassifier(loss='squared_hinge', C=1.0)),
+        #('ridge', RidgeClassifier(tol=1e-2, solver="lsqr"))
+        #('nb', MultinomialNB('''fit_prior=False'''))
+    ])
+
+    # create dataset from file
+    data = openDataset('files/processed/dataset.p', cat_name, element_per_cat)
+
+    performGridSearch(pipeline, data, cat_name)
+
+    # encode output with labelencoder
     classList, encoded_output = encodeData(data)
     out = encoded_output.tolist()
     inp = data.input.tolist()
@@ -201,32 +210,6 @@ if __name__ == "__main__":
     # classification report
     print(classification_report(y_test, y_preds, target_names=classList))
     
-    # GRID SEARCH
-    
-    '''
-    # find the best parameters for both the feature extraction and the
-    # classifier
-    grid_search = GridSearchCV(pipeline, parameters, n_jobs=-1, verbose=1)
-
-    print("Performing grid search...")
-    print("pipeline:", [name for name, _ in pipeline.steps])
-    print("parameters:")
-    pprint(parameters)
-    t0 = time()
-
-    print(data.cat_main)
-    grid_search.fit(data.input, data.cat_main)
-    print("done in %0.3fs" % (time() - t0))
-    print()
-
-    print("Best score: %0.3f" % grid_search.best_score_)
-    print("Best parameters set:")
-    best_parameters = grid_search.best_estimator_.get_params()
-    for param_name in sorted(parameters.keys()):
-        print("\t%s: %r" % (param_name, best_parameters[param_name]))
-    '''
-
-
     # TEST
 
     t = [cleanText("At some point you just need to stop looking and be blissfully ignorant...this was not one of those days. In and update to my previously updated blog article, I have found another instance where the plaintext password was written to system logs. This time I found it in more persistent log. This is actually a worse problem than the one I previously reported on. The previous examples were found in the unified logs which can hang around for a few weeks, this new example stores the exact same information in the system's / var / log / install.log. I have found that the install.log will only get wiped out upon major re - installation(ie: 10.11 -> 10.12 -> 10.13), therefore these plaintext passwords will hang around for quite a bit longer than a few weeks! I had entries dating back to when I originally installed High Sierra on this system back in November of 2017! Twitter user @sirkkalap, was unable to re - create what I previously reported on. I finally got some time this afternoon to re - test. As it turns out, I was unable to re - create my results from 03 / 24. I assumed that at some point in the past few days a silent security update was pushed out. I went to my install.log file to investigate further. As far as updates go - the only thing that has potential to be the cause of the fix is a GateKeeper ConfigData update v138(com.apple.pkg.GatekeeperConfigData.16U1432). I have not investigated if this was the true cause. I have not updated to 10.13.4 yet, this was on 10.13.3. During this investigations I was VERY surprised to see the same diskmanagementd logs that I had found in the unified logs. Why are they logged in the software installation log at all, I have no clue. It makes absolutely no sense to me.")]
