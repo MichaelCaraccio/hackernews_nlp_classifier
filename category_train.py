@@ -22,6 +22,8 @@ from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.linear_model import LogisticRegression
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -119,22 +121,26 @@ def performGridSearch(pipeline, data, cat_name):
         # 'vect__max_features': (None, 5000, 10000, 50000),
         'vect__ngram_range': ((1, 1), (1, 2)),  # unigrams or bigrams
         'tfidf__use_idf': (True, False),
-        'tfidf__norm': ('l1', 'l2', None),
+        'tfidf__norm': ('l1', 'l2'),
 
         'kbest__k': np.arange(3000, 15000, 500),
         'kbest__score_func': (chi2, f_classif, f_regression),
+
+        #'LogisticRegression__C': np.power(10.0, np.arange(-10, 10)),
+        #'LogisticRegression__solver': ['newton-cg', 'sag', 'lbfgs'],
+
         # 'nb__alpha': (1e-3, 1e-4),
 
         # 'clf__alpha': (0.00001, 0.000001, 0.0000001),
         # 'clf__penalty': ('l2', 'elasticnet'),
         ##'clf__n_iter': (10, 50, 80),
 
-        # 'SGD__loss': ('log', 'hinge'),
-        # 'SGD__penalty': ['l1', 'l2', 'elasticnet'],
-        # 'SGD__alpha': [0.001, 0.0001, 0.00001, 0.000001, 0.0000001, 0.00000001]
+        'SGD__loss': ('log', 'hinge'),
+        'SGD__penalty': ['l2'],
+        'SGD__alpha': [0.001, 0.0001, 0.00001, 0.000001, 0.0000001, 0.00000001]
     }
 
-    grid_search = RandomizedSearchCV(pipeline, parameters, n_jobs=4, verbose=5, n_iter=16)
+    grid_search = RandomizedSearchCV(pipeline, parameters, n_jobs=3, verbose=5, n_iter=100)
 
     print("Performing grid search...")
     print("pipeline:", [name for name, _ in pipeline.steps])
@@ -174,11 +180,19 @@ if __name__ == "__main__":
 
         # ('clf', SGDClassifier()),
 
-        # ("SGD", SGDClassifier(loss='modified_huber')),
+        # 0.7
+        #('ada', AdaBoostClassifier())
 
-        #("ASGD", SGDClassifier(average=True)),
-        ("Passive-Aggressive I", PassiveAggressiveClassifier(loss='hinge', C=1.0)),
-        # ("Passive-Aggressive II", PassiveAggressiveClassifier(loss='squared_hinge', C=1.0)),
+        ("SGD", SGDClassifier(loss='modified_huber')),
+
+        #("Passive-Aggressive I", PassiveAggressiveClassifier(loss='hinge', C=1.0)),
+
+        # 0.87
+        #("Passive-Aggressive II", PassiveAggressiveClassifier(loss='squared_hinge', C=1.0)),
+
+        # 0.75
+        #('LogisticRegression', LogisticRegression(n_jobs=-1, max_iter=500))
+
         # ('ridge', RidgeClassifier(tol=1e-2, solver="lsqr"))
         # ('nb', MultinomialNB('''fit_prior=False'''))
     ])
