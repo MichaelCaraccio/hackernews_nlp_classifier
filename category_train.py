@@ -118,39 +118,30 @@ def performGridSearch(pipeline, data, cat_name):
 
     parameters = {
         'vect__max_df': np.arange(0.7, 1, 0.05),
-        # 'vect__max_features': (None, 5000, 10000, 50000),
         'vect__ngram_range': ((1, 1), (1, 2)),  # unigrams or bigrams
+
         'tfidf__use_idf': (True, False),
         'tfidf__norm': ('l1', 'l2'),
 
         'kbest__k': np.arange(3000, 15000, 500),
         'kbest__score_func': (chi2, f_classif, f_regression),
 
-        #'LogisticRegression__C': np.power(10.0, np.arange(-10, 10)),
-        #'LogisticRegression__solver': ['newton-cg', 'sag', 'lbfgs'],
-
-        # 'nb__alpha': (1e-3, 1e-4),
-
-        # 'clf__alpha': (0.00001, 0.000001, 0.0000001),
-        # 'clf__penalty': ('l2', 'elasticnet'),
-        ##'clf__n_iter': (10, 50, 80),
-
-        'SGD__loss': ('log', 'hinge'),
+        'SGD__loss': ('log', 'modified_huber'), # only those two for probability estimation
         'SGD__penalty': ['l2'],
         'SGD__alpha': [0.001, 0.0001, 0.00001, 0.000001, 0.0000001, 0.00000001]
     }
 
+    # Gridsearch
     grid_search = RandomizedSearchCV(pipeline, parameters, n_jobs=3, verbose=5, n_iter=100)
 
     print("Performing grid search...")
-    print("pipeline:", [name for name, _ in pipeline.steps])
-    print("parameters:")
+    print("Pipeline:", [name for name, _ in pipeline.steps])
+    print("Parameters:")
     pprint(parameters)
     t0 = time.time()
     print(data[cat_name])
     grid_search.fit(inp, out)
     print("done in %0.3fs" % (time.time() - t0))
-    print()
     print("Best score: %0.3f" % grid_search.best_score_)
     print("Best parameters set:")
     best_parameters = grid_search.best_estimator_.get_params()
@@ -160,43 +151,32 @@ def performGridSearch(pipeline, data, cat_name):
     current_time = time.strftime("%Y%m%d-%H%M%S")
     joblib.dump(best_parameters, models_path + 'best_parameters_' + cat_name + '_' + str(current_time) + '.pkl', compress=1)
 
-    return best_parameters
-
-
 if __name__ == "__main__":
-    # Define
+    
+    # -------------------------------------------------------------------------
+    # PARAMETERS
+    # -------------------------------------------------------------------------
+
     cat_name = 'cat_main'
     element_per_cat = 8300
     test_size = 0.33
     seed = 7
 
+    # -------------------------------------------------------------------------
+    # PIPELINE
+    # -------------------------------------------------------------------------
+
     pipeline = Pipeline([
         ('vect', CountVectorizer()),
         ('tfidf', TfidfTransformer()),
-
-        # Dimention reduction
-        # Find the 4000 most informative columns
         ('kbest', SelectKBest()),
-
-        # ('clf', SGDClassifier()),
-
-        # 0.7
-        #('ada', AdaBoostClassifier())
-
         ("SGD", SGDClassifier(loss='modified_huber')),
-
-        #("Passive-Aggressive I", PassiveAggressiveClassifier(loss='hinge', C=1.0)),
-
-        # 0.87
-        #("Passive-Aggressive II", PassiveAggressiveClassifier(loss='squared_hinge', C=1.0)),
-
-        # 0.75
-        #('LogisticRegression', LogisticRegression(n_jobs=-1, max_iter=500))
-
-        # ('ridge', RidgeClassifier(tol=1e-2, solver="lsqr"))
-        # ('nb', MultinomialNB('''fit_prior=False'''))
     ])
 
+    # -------------------------------------------------------------------------
+    # OPEN DATASET AND ENCODE OUTPUT
+    # -------------------------------------------------------------------------
+    
     # create dataset from file
     data = openDataset('files/processed/dataset.p', cat_name, element_per_cat)
 
@@ -204,14 +184,25 @@ if __name__ == "__main__":
     classList, encoded_output = encodeData(data)
     out = encoded_output.tolist()
     inp = data.input.tolist()
+    
+    # -------------------------------------------------------------------------
+    # GRIDSEARCH
+    # -------------------------------------------------------------------------
 
-    best_params = performGridSearch(pipeline, data, cat_name)
+    # Gridsearch
+    #performGridSearch(pipeline, data, cat_name)
 
-    # split dataset
+    # -------------------------------------------------------------------------
+    # CREATE MODEL AND CONFUSION MATRIX - CLASSIFICATION REPORT
+    # -------------------------------------------------------------------------
+
+    # Split dataset
     X_train, X_test, y_train, y_test = model_selection.train_test_split(inp, out, test_size=test_size, random_state=seed)
 
-    # pipeline
-    pipeline.set_params(best_params)
+    best_params = joblib.load('files/models/best_parameters_cat_main_20180412-183447.pkl')
+
+    # Pipeline - Set previous parameters
+    pipeline.set_params(**best_params)
     pipeline.fit(X_train, y_train)
 
     # predict test instances
@@ -224,7 +215,9 @@ if __name__ == "__main__":
     # classification report
     print(classification_report(y_test, y_preds, target_names=classList))
 
+    # -------------------------------------------------------------------------
     # TEST
+    # -------------------------------------------------------------------------
 
     t = [cleanText(
         "At some point you just need to stop looking and be blissfully ignorant...this was not one of those days. In and update to my previously updated blog article, I have found another instance where the plaintext password was written to system logs. This time I found it in more persistent log. This is actually a worse problem than the one I previously reported on. The previous examples were found in the unified logs which can hang around for a few weeks, this new example stores the exact same information in the system's / var / log / install.log. I have found that the install.log will only get wiped out upon major re - installation(ie: 10.11 -> 10.12 -> 10.13), therefore these plaintext passwords will hang around for quite a bit longer than a few weeks! I had entries dating back to when I originally installed High Sierra on this system back in November of 2017! Twitter user @sirkkalap, was unable to re - create what I previously reported on. I finally got some time this afternoon to re - test. As it turns out, I was unable to re - create my results from 03 / 24. I assumed that at some point in the past few days a silent security update was pushed out. I went to my install.log file to investigate further. As far as updates go - the only thing that has potential to be the cause of the fix is a GateKeeper ConfigData update v138(com.apple.pkg.GatekeeperConfigData.16U1432). I have not investigated if this was the true cause. I have not updated to 10.13.4 yet, this was on 10.13.3. During this investigations I was VERY surprised to see the same diskmanagementd logs that I had found in the unified logs. Why are they logged in the software installation log at all, I have no clue. It makes absolutely no sense to me.")]
