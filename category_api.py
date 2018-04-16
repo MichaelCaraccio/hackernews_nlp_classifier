@@ -27,7 +27,7 @@ CATEGORIES = OrderedDict([
     ("eess*", "Electrical Engineering and Systems Science")
     ])
 
-sys.setrecursionlimit(1000000)  # 10000 is an example, try with different values
+sys.setrecursionlimit(1000000)
 
 def get_entries(xml_root, cat_main):
     entries = []
@@ -61,7 +61,7 @@ if __name__ == '__main__':
             url = 'http://export.arxiv.org/api/query?search_query=cat:' + \
                 str(key) + '&start=' + str(start) + '&max_results=' + str(max_results)
 
-            filename = './files/raw2/' + val.lower().replace(' ', '_') + '_' + str(start) + '.p'
+            filename = './files/raw/' + val.lower().replace(' ', '_') + '_' + str(start) + '.p'
 
             print(filename)
 
