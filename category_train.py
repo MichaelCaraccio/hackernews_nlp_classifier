@@ -170,7 +170,7 @@ if __name__ == "__main__":
         ('vect', CountVectorizer()),
         ('tfidf', TfidfTransformer()),
         ('kbest', SelectKBest()),
-        ("SGD", SGDClassifier(loss='modified_huber')),
+        ("SGD", SGDClassifier()),
     ])
 
     # -------------------------------------------------------------------------
