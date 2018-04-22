@@ -199,7 +199,7 @@ if __name__ == "__main__":
     # Split dataset
     X_train, X_test, y_train, y_test = model_selection.train_test_split(inp, out, test_size=test_size, random_state=seed)
 
-    best_params = joblib.load('files/models/best_parameters_cat_main_20180412-183447.pkl')
+    best_params = joblib.load('files/models/best_parameters_cat_main_20180416-224513.pkl')
 
     # Pipeline - Set previous parameters
     pipeline.set_params(**best_params)
