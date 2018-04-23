@@ -46,6 +46,7 @@ if __name__ == '__main__':
 
     start = 0
     max_results = 1000
+    models_path = './files/models/'
 
     CATEGORIES = OrderedDict([
         ("cs*", "Computer Science"),
@@ -100,7 +101,7 @@ if __name__ == '__main__':
 
                     # Store in Pickle
                     if start != 0:
-                        pickle.dump(entries, open(filename, "wb"))
+                        pickle.dump(entries, open(models_path + filename, "wb"))
                 except:
                     print(sys.exc_info())
                     pass
