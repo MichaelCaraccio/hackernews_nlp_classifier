@@ -62,7 +62,6 @@ def cleanText(text):
     words = [w for w in words if not w in stop_words]
 
     stemmed = [wordnet.lemmatize(word) for word in words]
-
     return ' '.join(stemmed)
 
 
@@ -108,13 +107,12 @@ def getClassNameFromProba(probaArray, enc):
     return enc[idx]
 
 
-def performGridSearch(pipeline, data, cat_name):
+def performGridSearch(pipeline, data, cat_name, models_path):
+    
     # encode output with labelencoder
     classList, encoded_output = encodeData(data)
     out = encoded_output.tolist()
     inp = data.input.tolist()
-
-    models_path = './files/models/'
 
     parameters = {
         'vect__max_df': np.arange(0.7, 1, 0.05),
@@ -149,7 +147,11 @@ def performGridSearch(pipeline, data, cat_name):
         print("\t%s: %r" % (param_name, best_parameters[param_name]))
 
     current_time = time.strftime("%Y%m%d-%H%M%S")
+
+    # Save best_params, estimator and classlist in Pickle
     joblib.dump(best_parameters, models_path + 'best_parameters_' + cat_name + '_' + str(current_time) + '.pkl', compress=1)
+    joblib.dump(grid_search.best_estimator_, models_path + 'estimator_' + cat_name + '_' + str(current_time) + '.pkl', compress=1)
+    joblib.dump(classList, models_path + 'classlist_' + cat_name + '_' + str(current_time) + '.pkl', compress=1)
 
 if __name__ == "__main__":
     
@@ -161,6 +163,7 @@ if __name__ == "__main__":
     element_per_cat = 8300
     test_size = 0.33
     seed = 7
+    models_path = './files/models/'
 
     # -------------------------------------------------------------------------
     # PIPELINE
@@ -190,16 +193,17 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
 
     # Gridsearch
-    #performGridSearch(pipeline, data, cat_name)
+    #performGridSearch(pipeline, data, cat_name, models_path)
 
     # -------------------------------------------------------------------------
     # CREATE MODEL AND CONFUSION MATRIX - CLASSIFICATION REPORT
     # -------------------------------------------------------------------------
-
+    
     # Split dataset
     X_train, X_test, y_train, y_test = model_selection.train_test_split(inp, out, test_size=test_size, random_state=seed)
 
-    best_params = joblib.load('files/models/best_parameters_cat_main_20180416-224513.pkl')
+    best_params = joblib.load(models_path + 'best_parameters_cat_main_20180416-224513.pkl')
+    classList = joblib.load(models_path + 'classlist_cat_main_20180416-224513.pkl')
 
     # Pipeline - Set previous parameters
     pipeline.set_params(**best_params)
@@ -218,13 +222,16 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     # TEST
     # -------------------------------------------------------------------------
-
+    
     t = [cleanText(
         "At some point you just need to stop looking and be blissfully ignorant...this was not one of those days. In and update to my previously updated blog article, I have found another instance where the plaintext password was written to system logs. This time I found it in more persistent log. This is actually a worse problem than the one I previously reported on. The previous examples were found in the unified logs which can hang around for a few weeks, this new example stores the exact same information in the system's / var / log / install.log. I have found that the install.log will only get wiped out upon major re - installation(ie: 10.11 -> 10.12 -> 10.13), therefore these plaintext passwords will hang around for quite a bit longer than a few weeks! I had entries dating back to when I originally installed High Sierra on this system back in November of 2017! Twitter user @sirkkalap, was unable to re - create what I previously reported on. I finally got some time this afternoon to re - test. As it turns out, I was unable to re - create my results from 03 / 24. I assumed that at some point in the past few days a silent security update was pushed out. I went to my install.log file to investigate further. As far as updates go - the only thing that has potential to be the cause of the fix is a GateKeeper ConfigData update v138(com.apple.pkg.GatekeeperConfigData.16U1432). I have not investigated if this was the true cause. I have not updated to 10.13.4 yet, this was on 10.13.3. During this investigations I was VERY surprised to see the same diskmanagementd logs that I had found in the unified logs. Why are they logged in the software installation log at all, I have no clue. It makes absolutely no sense to me.")]
 
-    r = pipeline.predict_proba(t)
-    className = getClassNameFromProba(r, classList)
-    print(className)
+    print(t)
+    clf = joblib.load(models_path + 'estimator_cat_main_20180423-112330.pkl')
+    r = clf.predict_proba(t)
+    print(r)
+    #className = getClassNameFromProba(r, classList)
+    #print(className)
 
     t = [cleanText('International Union for the Conservation of Nature, the body that administers the world’s official endangered species list, announced yesterday that it was moving the giraffe from a species of Least Concern to Vulnerable status in its Red List of Threatened Species report. That means the animal faces extinction in the wild in the medium - term future if nothing is done to minimize the threats to its life or habitat. The next steps are endangered, critically endangered, extinct in the wild and extinct. RELATED CONTENT \
                    How America Can Help Save a Non - American Species: The Mighty Giraffe\
