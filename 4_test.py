@@ -59,8 +59,8 @@ def get_class_name_from_proba(proba_array, enc):
 if __name__ == '__main__':
     models_path = './files/models/'
 
-    classList = joblib.load(models_path + 'classlist_cat_main_20180423-121903.pkl')
-    clf = joblib.load(models_path + 'estimator_cat_main_20180423-121903.pkl')
+    classList = joblib.load(models_path + 'classlist_cat_main_20180423-234137.pkl')
+    clf = joblib.load(models_path + 'estimator_cat_main_20180423-234137.pkl')
 
     t = [clean_text(
         "At some point you just need to stop looking and be blissfully ignorant...this was not one of those days. In "
