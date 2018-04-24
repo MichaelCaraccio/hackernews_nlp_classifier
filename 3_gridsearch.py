@@ -56,12 +56,12 @@ def open_dataset(filename, catname, nb_element_per_cat, sub_cat_filter=None):
 
         # If no filter -> get all categories
         if not sub_cat_filter:
-            if d[catname].value_counts()[cat] > nb_element_per_cat:
+            if d[catname].value_counts()[cat] >= nb_element_per_cat:
                 cat1 = d[(d[catname] == cat)].sample(n=nb_element_per_cat)
                 df = pd.concat([df, cat1], axis=0)
         else:
             # Get specific categories with filter
-            if cat.startswith(sub_cat_filter) and d[catname].value_counts()[cat] > nb_element_per_cat:
+            if cat.startswith(sub_cat_filter) and d[catname].value_counts()[cat] >= nb_element_per_cat:
                 cat1 = d[(d.cat == cat)].sample(n=nb_element_per_cat)
                 df = pd.concat([df, cat1], axis=0)
 
